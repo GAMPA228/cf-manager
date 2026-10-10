@@ -196,6 +196,7 @@ export async function proxyFetch(input: string | URL, init?: any, timeoutMs: num
   // Create AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let proxyInit = init;
   
   try {
     if (!agent) {
@@ -204,7 +205,17 @@ export async function proxyFetch(input: string | URL, init?: any, timeoutMs: num
       return response;
     }
 
-    const doFetch = () => nodeFetch(input.toString(), { ...init, agent, timeout: timeoutMs });
+    // node-fetch v2 不支持原生 FormData；先序列化为可重试的 multipart Buffer。
+    if (init?.body instanceof FormData) {
+      const multipart = new Response(init.body);
+      const body = Buffer.from(await multipart.arrayBuffer());
+      const headers = new Headers(init.headers);
+      headers.set('Content-Type', multipart.headers.get('Content-Type')!);
+      headers.set('Content-Length', String(body.length));
+      proxyInit = { ...init, headers: Object.fromEntries(headers), body };
+    }
+
+    const doFetch = () => nodeFetch(input.toString(), { ...proxyInit, agent, timeout: timeoutMs });
     const result = await doFetch() as unknown as FetchResponse;
     clearTimeout(timeoutId);
     return result;
@@ -230,11 +241,11 @@ export async function proxyFetch(input: string | URL, init?: any, timeoutMs: num
       const retryTimeoutId = setTimeout(() => retryController.abort(), timeoutMs);
       try {
         if (!newAgent) {
-          const response = await fetch(input, { ...init, signal: retryController.signal }) as unknown as FetchResponse;
+          const response = await fetch(input, { ...proxyInit, signal: retryController.signal }) as unknown as FetchResponse;
           clearTimeout(retryTimeoutId);
           return response;
         }
-        const result = await nodeFetch(input.toString(), { ...init, agent: newAgent, timeout: timeoutMs }) as unknown as FetchResponse;
+        const result = await nodeFetch(input.toString(), { ...proxyInit, agent: newAgent, timeout: timeoutMs }) as unknown as FetchResponse;
         clearTimeout(retryTimeoutId);
         return result;
       } catch (retryErr) {

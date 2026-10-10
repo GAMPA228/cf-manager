@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.1] - 2026-10-10
+
+### 🐞 修复
+
+- 修复 Docker 后端启用 HTTP/SOCKS 代理时，原生 FormData 未正确编码导致 Pages 部署报错 `A "manifest" field was expected in the request body` 的问题；上传请求保留完整 multipart 字段和文件，并在连接重试时复用相同请求体与 boundary。Cloudflare Worker 后端使用原生 fetch，无需此兼容处理。
+
 ## [2.3.0] - 2026-09-23
 
 ### ✨ 新功能
