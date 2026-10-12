@@ -67,6 +67,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENV PORT=3000
 ENV DB_PATH=/app/data/cf-manager.db
+ENV LOG_DIR=/app/data/logs
 
 EXPOSE 3000
 

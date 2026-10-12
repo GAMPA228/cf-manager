@@ -5,7 +5,7 @@
 # 宿主机 ./data 通过 volume 挂载到 /app/data，若宿主属主不是 1000:1000，
 # node 进程启动时 better-sqlite3 会 EACCES 导致容器秒退（"无法升级"）。
 #
-# 此脚本以 root 启动，先修复 /app 与 /app/data 的属主，再 su-exec drop 到 node 执行 CMD。
+# 此脚本以 root 启动，先修复持久数据目录的属主，再 su-exec drop 到 node 执行 CMD。
 # 进程以 node 身份运行，最小特权依旧保留（写 /app/data 之外只读系统）。
 # ------------------------------------------------------------
 set -eu
@@ -25,12 +25,7 @@ if [ -d "$DATA_DIR" ]; then
   chown -R node:node "$DATA_DIR" || true
 fi
 
-# /app 下的可写文件（如日志落盘 / tmp）也归 node，避免运行时再 EACCES。
-# /app/node_modules /app/dist /app/public 在构建期已 root 拥有（node 可读），
-# 全部 chown 一次成本极低（缓存友好），避免极少数运行时写文件失败。
-if [ -d /app ]; then
-  chown -R node:node /app || true
-fi
+# 应用代码与依赖保持只读；运行时数据库和日志写入上面的数据目录。
 
 # 用 su-exec drop 到 node 执行 CMD。su-exec 不杀 shell、正确转发信号，
 # 是 Alpine 上 gosu 的标准替代。
